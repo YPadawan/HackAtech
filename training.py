@@ -14,6 +14,7 @@ import pandas as pd
 class EncoderResNetDecoder(pl.LightningModule):
     def __init__(self,  learning_rate):
         super().__init__()
+        self.save_hyperparameters()
         self.encoder = Encoder()
         self.resnet = ResNet(in_channels=256, num_blocks=5)
         self.decoder = Decoder()
@@ -53,7 +54,7 @@ class EMG2HandPoseDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        return (len(self.csv_dataset)  // 5) - (1000//5)
+        return (len(self.csv_dataset) // 5) - (1000//5)
 
     def __getitem__(self, idx):
         subsequence = self.csv_dataset.iloc[idx*5:idx*5+1000]
@@ -62,6 +63,7 @@ class EMG2HandPoseDataset(Dataset):
             sample = self.transform(subsequence)
 
         x = subsequence[['Channel_1', 'Channel_2', 'Channel_3', 'Channel_4', 'Channel_5', 'Channel_6', 'Channel_7', 'Channel_8']].values
+        x / 2500.
         y = subsequence[['Thumb_TMC_fe', 'Thumb_tmc_aa', 'Thumb_mcp_fe', 'Thumb_mcp_aa', 'Index_mcp_fe', 'Index_mcp_aa',
            'Index_pip', 'Middle_mcp_fe', 'Middle_mcp_aa', 'Middle_pip',
            'Ring_mcp_fe', 'Ring_mcp_aa', 'Ring_pip', 'Little_mcp_fe',
@@ -70,14 +72,15 @@ class EMG2HandPoseDataset(Dataset):
         return torch.from_numpy(x.astype('float32')).unsqueeze(0), torch.from_numpy(y.astype('float32')).unsqueeze(0)
 
 
-dataset = EMG2HandPoseDataset("./core_angles-core_hand-90s.csv")
+train_dataset = EMG2HandPoseDataset("./train.csv")
+val_dataset = EMG2HandPoseDataset("./test.csv")
 
-train_dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=4)
-val_dataloader = DataLoader(dataset, batch_size=32, shuffle=True, num_workers=4) #TODO : create a validation dataset and dataloader
+train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
+val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
 
 model = EncoderResNetDecoder(learning_rate=0.001)
 
 # training
-trainer = pl.Trainer(auto_lr_find=True)
+trainer = pl.Trainer(auto_lr_find=True, accelerator='gpu', devices=1, max_epochs=100)
 trainer.tune(model, train_dataloader, val_dataloader)
 trainer.fit(model, train_dataloader, val_dataloader)
