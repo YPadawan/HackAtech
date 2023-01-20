@@ -80,13 +80,10 @@ class ResidualBlock(nn.Module):
 class ResNet(nn.Module):
     def __init__(self, in_channels, num_blocks):
         super(ResNet, self).__init__()
-        self.blocks = [ResidualBlock(in_channels=256) for i in range(num_blocks)]
+        self.blocks = nn.Sequential(*[ResidualBlock(in_channels=256) for i in range(num_blocks)])
 
     def forward(self, x):
-        for block in self.blocks:
-            x = block(x)
-
-        return x
+        return self.blocks(x)
 
 
 class Decoder(nn.Module):
