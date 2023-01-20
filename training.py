@@ -54,13 +54,15 @@ data_pytorch = torch.from_numpy(data)
 y_pytorch = torch.from_numpy(y)
 
 #dataset = MNIST('', train=True, download=True, transform=transforms.ToTensor())
-#mnist_train, mnist_val = random_split(dataset, [55000, 5000])
+data_train, data_val = random_split(dataset, [55000, 5000])
+
+train_loader = DataLoader
 
 train_loader = DataLoader(mnist_train, batch_size=32)
 val_loader = DataLoader(mnist_val, batch_size=32)
 
 # model
-model = LitAutoEncoder()
+model = EncoderResNetDecoder()
 
 # training
 trainer = pl.Trainer(gpus=4, num_nodes=8, precision=16, limit_train_batches=0.5)
