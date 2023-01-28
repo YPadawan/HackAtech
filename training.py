@@ -12,13 +12,22 @@ import pandas as pd
 
 
 class EncoderResNetDecoder(pl.LightningModule):
-    def __init__(self,  learning_rate):
+    def __init__(self, learning_rate):
         super().__init__()
         self.save_hyperparameters()
         self.encoder = Encoder()
-        self.resnet = ResNet(in_channels=256, num_blocks=5)
+        self.resnet = ResNet(in_channels=256, num_blocks=1)
         self.decoder = Decoder()
         self.learning_rate = learning_rate
+        # self.mlp = nn.Sequential(
+        #     nn.Linear(8, 16),
+        #     nn.ReLU(),
+        #     nn.Linear(16, 32),
+        #     nn.ReLU(),
+        #     nn.Linear(32, 64),
+        #     nn.ReLU(),
+        #     nn.Linear(64, 16)
+        # )
 
     def forward(self, x):
         x = self.encoder(x)
@@ -54,33 +63,35 @@ class EMG2HandPoseDataset(Dataset):
         self.transform = transform
 
     def __len__(self):
-        return (len(self.csv_dataset) // 5) - (1000//5)
+        return (len(self.csv_dataset) // 2) - (1000 // 2)
 
     def __getitem__(self, idx):
-        subsequence = self.csv_dataset.iloc[idx*5:idx*5+1000]
+        subsequence = self.csv_dataset.iloc[idx * 2:idx * 2 + 1000]
 
         if self.transform:
             sample = self.transform(subsequence)
 
-        x = subsequence[['Channel_1', 'Channel_2', 'Channel_3', 'Channel_4', 'Channel_5', 'Channel_6', 'Channel_7', 'Channel_8']].values
-        x / 2500.
+        x = subsequence[['Channel_1', 'Channel_2', 'Channel_3', 'Channel_4', 'Channel_5', 'Channel_6', 'Channel_7',
+                         'Channel_8']].values
+        x = x / 2500.
         y = subsequence[['Thumb_TMC_fe', 'Thumb_tmc_aa', 'Thumb_mcp_fe', 'Thumb_mcp_aa', 'Index_mcp_fe', 'Index_mcp_aa',
-           'Index_pip', 'Middle_mcp_fe', 'Middle_mcp_aa', 'Middle_pip',
-           'Ring_mcp_fe', 'Ring_mcp_aa', 'Ring_pip', 'Little_mcp_fe',
-           'Little_mcp_aa', 'Little_pip']].values
+                         'Index_pip', 'Middle_mcp_fe', 'Middle_mcp_aa', 'Middle_pip',
+                         'Ring_mcp_fe', 'Ring_mcp_aa', 'Ring_pip', 'Little_mcp_fe',
+                         'Little_mcp_aa', 'Little_pip']].values
 
         return torch.from_numpy(x.astype('float32')).unsqueeze(0), torch.from_numpy(y.astype('float32')).unsqueeze(0)
 
 
-train_dataset = EMG2HandPoseDataset("./train.csv")
-val_dataset = EMG2HandPoseDataset("./test.csv")
+if __name__ == "__main__":
+    train_dataset = EMG2HandPoseDataset("./train_max.csv")
+    val_dataset = EMG2HandPoseDataset("./val_max.csv")
 
-train_dataloader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=4)
-val_dataloader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=4)
+    train_dataloader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=4)
+    val_dataloader = DataLoader(val_dataset, batch_size=128, shuffle=False, num_workers=4)
 
-model = EncoderResNetDecoder(learning_rate=0.001)
+    model = EncoderResNetDecoder(learning_rate=0.001)
 
-# training
-trainer = pl.Trainer(auto_lr_find=True, accelerator='gpu', devices=1, max_epochs=100)
-trainer.tune(model, train_dataloader, val_dataloader)
-trainer.fit(model, train_dataloader, val_dataloader)
+    # training
+    trainer = pl.Trainer(accelerator='gpu', devices=1, max_epochs=100)
+    # trainer.tune(model, train_dataloader, val_dataloader)
+    trainer.fit(model, train_dataloader, val_dataloader)
